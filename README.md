@@ -1,14 +1,7 @@
 # autorest
 
-A Clojure library designed to ... well, that part is up to you.
+An API that introspects your database and provides a REST API on top of it.
 
 ## Usage
 
 FIXME
-
-## License
-
-Copyright © 2014 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
