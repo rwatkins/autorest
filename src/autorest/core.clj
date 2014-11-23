@@ -70,26 +70,27 @@
 (defn table-handler
   [request]
   (condp = (:request-method request)
-    :get (let [table (-> request :params :table)]
-           (if-not (valid-table? table)
-             (response 404 (str table " is not a valid resource."))
-             (let [columns (->> table
-                             (get-columns db-spec)
-                             (map :column_name))]
-               (if-let [resource-id (-> request :params :id)]
-                 ;; Get one row
-                 (let [query [(format "SELECT %s FROM %s WHERE id=?"
-                                      (string/join ", " columns)
-                                      table)
-                              (Integer/parseInt resource-id)]
-                       obj (first (sql/query db-spec query))]
-                   (if-not (nil? obj)
-                     (response obj)
-                     (response 404 "Not Found")))
-                 ;; Get all rows
-                 (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
-                       result (sql/query db-spec query)]
-                   (response (vec result)))))))
+    :get
+    (let [table (-> request :params :table)]
+      (if-not (valid-table? table)
+        (response 404 (str table " is not a valid resource."))
+        (let [columns (->> table
+                        (get-columns db-spec)
+                        (map :column_name))]
+          (if-let [resource-id (-> request :params :id)]
+            ;; Get one row
+            (let [query [(format "SELECT %s FROM %s WHERE id=?"
+                                 (string/join ", " columns)
+                                 table)
+                         (Integer/parseInt resource-id)]
+                  obj (first (sql/query db-spec query))]
+              (if-not (nil? obj)
+                (response obj)
+                (response 404 "Not Found")))
+            ;; Get all rows
+            (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
+                  result (sql/query db-spec query)]
+              (response (vec result)))))))
     (not-implemented)))
 
 (defn echo-handler [request]
