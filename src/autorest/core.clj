@@ -40,6 +40,7 @@
   {:result result})
 
 (defn response
+  ([] (response ""))
   ([data] (response 200 data))
   ([status data]
    (let [envelope (if (< status 400) envelope-result envelope-error)]
