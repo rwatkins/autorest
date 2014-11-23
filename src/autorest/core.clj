@@ -1,6 +1,7 @@
 (ns autorest.core
   (:require [cheshire.core :as json]
             [clojure.java.jdbc :as sql]
+            [clojure.pprint :refer [pprint]]
             [clojure.string :as string]
             [polaris.core :as polaris]
             ring.adapter.jetty))
@@ -95,7 +96,7 @@
     (not-implemented)))
 
 (defn echo-handler [request]
-  {:body (str request)
+  {:body (with-out-str (pprint request))
    :status 200
    :headers {"Content-Type" "text/plain"}})
 
