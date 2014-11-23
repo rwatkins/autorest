@@ -1,7 +1,7 @@
 (ns autorest.core
   (:require [cheshire.core :as json]
-            [clojure.string :as string]
             [clojure.java.jdbc :as sql]
+            [clojure.string :as string]
             [polaris.core :as polaris]
             ring.adapter.jetty))
 
