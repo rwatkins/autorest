@@ -93,6 +93,14 @@
             (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
                   result (sql/query db-spec query)]
               (response (vec result)))))))
+    :post
+    (let [table (-> request :params :table)
+          columns (->> table
+                    (get-columns db-spec)
+                    (map :column_name))
+          data (json/parse-string (slurp (:body request)))
+          obj (first (sql/insert! db-spec table data))]
+      (response 201 obj))
     (not-implemented)))
 
 (defn echo-handler [request]
