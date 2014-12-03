@@ -44,10 +44,14 @@
   ([] (response ""))
   ([data] (response 200 data))
   ([status data]
-   (let [envelope (if (< status 400) envelope-result envelope-error)]
-     {:body (json/generate-string (envelope data))
+   (let [envelope (if (< status 400) envelope-result envelope-error)
+         data (assoc (envelope data) :status status)]
+     {:body (json/generate-string data)
       :status status
       :headers {"Content-Type" "application/json"}})))
+
+(defn method-not-allowed []
+  (response 405 "Method Not Allowed"))
 
 (defn not-implemented []
   (response 501 "Not Implemented"))
@@ -69,39 +73,44 @@
   (let [tables (map :table_name (get-tables db-spec))]
     (some #{table} tables)))
 
-(defn table-handler
+(defmulti table-handler :request-method)
+
+(defmethod table-handler :default
   [request]
-  (condp = (:request-method request)
-    :get
-    (let [table (-> request :params :table)]
-      (if-not (valid-table? table)
-        (response 404 (str table " is not a valid resource."))
-        (let [columns (->> table
-                        (get-columns db-spec)
-                        (map :column_name))]
-          (if-let [resource-id (-> request :params :id)]
-            ;; Get one row
-            (let [query [(format "SELECT %s FROM %s WHERE id=?"
-                                 (string/join ", " columns)
-                                 table)
-                         (Integer/parseInt resource-id)]
-                  obj (first (sql/query db-spec query))]
-              (if-not (nil? obj)
-                (response obj)
-                (response 404 "Not Found")))
-            ;; Get all rows
-            (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
-                  result (sql/query db-spec query)]
-              (response (vec result)))))))
-    :post
-    (let [table (-> request :params :table)
-          columns (->> table
-                    (get-columns db-spec)
-                    (map :column_name))
-          data (json/parse-string (slurp (:body request)))
-          obj (first (sql/insert! db-spec table data))]
-      (response 201 obj))
-    (not-implemented)))
+  (method-not-allowed))
+
+(defmethod table-handler :get
+  [request]
+  (let [table (-> request :params :table)]
+    (if-not (valid-table? table)
+      (response 404 (str table " is not a valid resource."))
+      (let [columns (->> table
+                      (get-columns db-spec)
+                      (map :column_name))]
+        (if-let [resource-id (-> request :params :id)]
+          ;; Get one row
+          (let [query [(format "SELECT %s FROM %s WHERE id=?"
+                               (string/join ", " columns)
+                               table)
+                       (Integer/parseInt resource-id)]
+                obj (first (sql/query db-spec query))]
+            (if-not (nil? obj)
+              (response obj)
+              (response 404 "Not Found")))
+          ;; Get all rows
+          (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
+                result (sql/query db-spec query)]
+            (response (vec result))))))))
+
+(defmethod table-handler :post
+  [request]
+  (let [table (-> request :params :table)
+        columns (->> table
+                  (get-columns db-spec)
+                  (map :column_name))
+        data (json/parse-string (slurp (:body request)))
+        obj (first (sql/insert! db-spec table data))]
+    (response 201 obj)))
 
 (defn echo-handler [request]
   {:body (with-out-str (pprint request))
