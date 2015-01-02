@@ -113,7 +113,7 @@
                               ;; Can't use a string to filter on an Int column,
                               ;; so we have to convert "id" values to an int
                               (map (fn [[k v]]
-                                     (if (.endsWith k "id")  ; stupid :(
+                                     (if (.endsWith k "id")  ; stupid
                                        (Integer/parseInt v)
                                        v))
                                    param-pairs)))]
