@@ -4,7 +4,8 @@
             [clojure.pprint :refer [pprint]]
             [clojure.string :as string]
             [polaris.core :as polaris]
-            ring.adapter.jetty))
+            ring.adapter.jetty
+            ring.middleware.params))
 
 ;; Data
 (def defaults ["localhost" 5432 "addressbook"])
@@ -84,13 +85,13 @@
   (let [table (-> request :params :table)]
     (if-not (valid-table? table)
       (response 404 (str table " is not a valid resource."))
-      (let [columns (->> table
-                      (get-columns db-spec)
-                      (map :column_name))]
+      (let [available-columns (->> table
+                                (get-columns db-spec)
+                                (map :column_name))]
         (if-let [resource-id (-> request :params :id)]
           ;; Get one row
           (let [query [(format "SELECT %s FROM %s WHERE id=?"
-                               (string/join ", " columns)
+                               (string/join ", " available-columns)
                                table)
                        (Integer/parseInt resource-id)]
                 obj (first (sql/query db-spec query))]
@@ -98,9 +99,25 @@
               (response obj)
               (response 404 "Not Found")))
           ;; Get all rows
-          (let [query (format "SELECT %s FROM %s" (string/join ", " columns) table)
-                result (sql/query db-spec query)]
-            (response (vec result))))))))
+          (let [param-pairs (filter (comp string? first) (:params request))
+                query (format "SELECT %s FROM %s"
+                              (string/join ", " available-columns)
+                              table)
+                wheres (string/join " AND "
+                         (map (fn [[k v]]
+                                (format "%s=?" k))
+                              param-pairs))
+                query (if (empty? wheres)
+                        query
+                        (into [(str query " WHERE " wheres)]
+                              ;; Can't use a string to filter on an Int column,
+                              ;; so we have to convert "id" values to an int
+                              (map (fn [[k v]]
+                                     (if (.endsWith k "id")
+                                       (Integer/parseInt v)
+                                       v))
+                                   param-pairs)))]
+            (response (vec (sql/query db-spec query)))))))))
 
 (defmethod table-handler :post
   [request]
@@ -127,7 +144,7 @@
 (def routes (polaris/build-routes route-definitions))
 
 ;; Ring main handler
-(def handler (polaris/router routes))
+(def handler (ring.middleware.params/wrap-params (polaris/router routes)))
 
 ;; Main handler
 (defn -main []
