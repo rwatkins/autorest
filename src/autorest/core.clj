@@ -58,7 +58,7 @@
   (response 501 "Not Implemented"))
 
 (defn base-handler
-  [{:keys [request-method] :as request}]
+  [{:keys [request-method]}]
   (condp = request-method
     :get (try
            (let [results (->> (get-tables db-spec)
@@ -82,7 +82,7 @@
   (method-not-allowed))
 
 (defmethod table-handler :get
-  [{{id :id table :table :as params} :params :as request}]
+  [{{:keys [id table] :as params} :params}]
   (if-not (valid-table? table)
     (response 404 (str table " is not a valid resource."))
     (let [available-columns (->> table
@@ -120,7 +120,7 @@
           (response (vec (sql/query db-spec query))))))))
 
 (defmethod table-handler :post
-  [{body :body {table :table :as params} :params :as request}]
+  [{body :body {table :table} :params}]
   (let [columns (->> table
                   (get-columns db-spec)
                   (map :column_name))
