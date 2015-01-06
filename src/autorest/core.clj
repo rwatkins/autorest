@@ -60,12 +60,13 @@
 (defn base-handler
   [{:keys [request-method] :as request}]
   (condp = request-method
-    :get (try (let [results (->> (get-tables db-spec)
-                              (map :table_name)
-                              (map ->Resource)
-                              (map (fn [r] {:name (:name r) :location (.url r)}))
-                              vec)]
-                (response {:resources results}))
+    :get (try
+           (let [results (->> (get-tables db-spec)
+                           (map :table_name)
+                           (map ->Resource)
+                           (map (fn [r] {:name (:name r) :location (.url r)}))
+                           vec)]
+             (response {:resources results}))
            (catch org.postgresql.util.PSQLException e
              (response 503 (.getMessage e))))
     (not-implemented)))
