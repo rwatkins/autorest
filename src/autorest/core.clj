@@ -58,8 +58,8 @@
   (response 501 "Not Implemented"))
 
 (defn base-handler
-  [request]
-  (condp = (:request-method request)
+  [{:keys [request-method] :as request}]
+  (condp = request-method
     :get (try (let [results (->> (get-tables db-spec)
                               (map :table_name)
                               (map ->Resource)
@@ -81,51 +81,49 @@
   (method-not-allowed))
 
 (defmethod table-handler :get
-  [request]
-  (let [table (-> request :params :table)]
-    (if-not (valid-table? table)
-      (response 404 (str table " is not a valid resource."))
-      (let [available-columns (->> table
-                                (get-columns db-spec)
-                                (map :column_name))]
-        (if-let [resource-id (-> request :params :id)]
-          ;; Get one row
-          (let [query [(format "SELECT %s FROM %s WHERE id=?"
-                               (string/join ", " available-columns)
-                               table)
-                       (Integer/parseInt resource-id)]
-                obj (first (sql/query db-spec query))]
-            (if-not (nil? obj)
-              (response obj)
-              (response 404 "Not Found")))
-          ;; Get all rows
-          (let [param-pairs (filter (comp string? first) (:params request))
-                query (format "SELECT %s FROM %s"
-                              (string/join ", " available-columns)
-                              table)
-                wheres (string/join " AND "
-                         (map (fn [[k v]]
-                                (format "%s=?" k))
-                              param-pairs))
-                query (if (empty? wheres)
-                        query
-                        (into [(str query " WHERE " wheres)]
-                              ;; Can't use a string to filter on an Int column,
-                              ;; so we have to convert "id" values to an int
-                              (map (fn [[k v]]
-                                     (if (.endsWith k "id")  ; stupid
-                                       (Integer/parseInt v)
-                                       v))
-                                   param-pairs)))]
-            (response (vec (sql/query db-spec query)))))))))
+  [{{id :id table :table :as params} :params :as request}]
+  (if-not (valid-table? table)
+    (response 404 (str table " is not a valid resource."))
+    (let [available-columns (->> table
+                              (get-columns db-spec)
+                              (map :column_name))]
+      (if-not (nil? id)
+        ;; Get one row
+        (let [query [(format "SELECT %s FROM %s WHERE id=?"
+                             (string/join ", " available-columns)
+                             table)
+                     (Integer/parseInt id)]
+              obj (first (sql/query db-spec query))]
+          (if-not (nil? obj)
+            (response obj)
+            (response 404 "Not Found")))
+        ;; Get all rows
+        (let [param-pairs (filter (comp string? first) params)
+              query (format "SELECT %s FROM %s"
+                            (string/join ", " available-columns)
+                            table)
+              wheres (string/join " AND "
+                       (map (fn [[k v]]
+                              (format "%s=?" k))
+                            param-pairs))
+              query (if (empty? wheres)
+                      query
+                      (into [(str query " WHERE " wheres)]
+                            ;; Can't use a string to filter on an Int column,
+                            ;; so we have to convert "id" values to an int
+                            (map (fn [[k v]]
+                                   (if (.endsWith k "id")  ; stupid
+                                     (Integer/parseInt v)
+                                     v))
+                                 param-pairs)))]
+          (response (vec (sql/query db-spec query))))))))
 
 (defmethod table-handler :post
-  [request]
-  (let [table (-> request :params :table)
-        columns (->> table
+  [{body :body {table :table :as params} :params :as request}]
+  (let [columns (->> table
                   (get-columns db-spec)
                   (map :column_name))
-        data (json/parse-string (slurp (:body request)))
+        data (json/parse-string (slurp body))
         obj (first (sql/insert! db-spec table data))]
     (response 201 obj)))
 
